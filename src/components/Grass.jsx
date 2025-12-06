@@ -45,9 +45,8 @@ function Grass({ lodConfig = "high", worldOffset = [0, 0, 0], patchSize = PATCHE
   )
 }
 
-function BladeOfGrass({ grassParams, ...delegated }) {
-  const { segments, patchSize, count, width, height } = grassParams;
-  
+function BladeOfGrass({ grassParams = {}, ...delegated }) {
+  const { segments, vertices, patchSize, count, width, height } = grassParams;
   const geometry = React.useMemo(() => {
     const indices = [];
 
@@ -62,7 +61,7 @@ function BladeOfGrass({ grassParams, ...delegated }) {
       indices[i*12 + 4] = vi + 1;
       indices[i*12 + 5] = vi + 3;
 
-      const fi = VERTICES + vi;
+      const fi = vertices + vi;
 
       indices[i*12 + 6] = fi + 2;
       indices[i*12 + 7] = fi + 1;
@@ -72,20 +71,32 @@ function BladeOfGrass({ grassParams, ...delegated }) {
       indices[i*12 + 10] = fi + 1;
       indices[i*12 + 11] = fi + 2;
     }
-
+    
     const geo = new THREE.InstancedBufferGeometry();
     geo.instanceCount = count;
     geo.setIndex(indices);
+
+    const vertexCount = vertices * 2;
+    // console.log(vertexCount, indices.length);
+    // Create storage buffer for positions (will be computed)
+    const vertexPositions = new Float32Array(vertexCount * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(vertexPositions, 3));
+
     geo.boundingSphere = new THREE.Sphere( 
       new THREE.Vector3(), 
       1 + patchSize * 2
     );
     return geo;
-  }, [ segments, count, patchSize ]);
+  }, [ segments, vertices, count, patchSize ]);
 
   return (
     <mesh geometry={geometry} >
-      <GrassMaterial grassParams={[ segments, patchSize, width, height ]} {...delegated} />
+      <GrassMaterial 
+        grassParams={[ segments, patchSize, width, height ]}
+        vertexCount={ vertices * 2 }
+        positionsArray={ geometry.attributes.position }
+        {...delegated}
+      />
     </mesh>
   )
 }

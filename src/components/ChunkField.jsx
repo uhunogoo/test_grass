@@ -36,15 +36,14 @@ function ChunkField({
   
   return (
     <>
-      { Array.from(allChunks.values()).map((chunk) => (
+      {/* { Array.from(allChunks.values()).map((chunk) => (
         // console.log( chunk )
-        <TestChunk 
-          key={ `${chunk.key} ${chunk.lod}` } 
-          position={ chunk.position } 
-          chunkSize={ chunkSize } 
-          lodConfig={ chunk.lod } 
-        />
-      )) }
+      )) } */}
+      <TestChunk 
+        position={[ 0, 0, 0 ]} 
+        chunkSize={ 25 } 
+        lodConfig={ "high" } 
+      />
     </>
   )
 }

@@ -355,9 +355,9 @@ const GrassShaderMaterial = shaderMaterial(
 )
 
 // declaratively
-extend({ GrassShaderMaterial });
+// extend({ GrassShaderMaterial });
 
-function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], ...delegated}) {
+function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], positionsArray = [], vertexCount = 0, ...delegated}) {
   const material = React.useRef( null );
   const tileDataTexture = useTexture('./tileTexture.png');
   const { nodes, uniforms } = React.useMemo(() => {
@@ -368,90 +368,54 @@ function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], ..
       // time: TSL.uniform( 0 ),
       resolution: TSL.uniform( TSL.vec2(1, 1) )
     };
-    console.log( uniforms )
+    
     const colorNode = TSL.Fn(() => {
       const uv = TSL.uv();
       const color = TSL.texture( uniforms.tileDataTexture, uv );
       
-      return TSL.vec4( 1, 1, 1, 1 );
+      return TSL.vec3( 0, 0, 0 );
     })();
-
-    const positionNode = TSL.Fn(() => {
-      // get params
-      const segments = TSL.int(uniforms.grassParams.x);
-      const vertices = segments.add(1).mul(2);
-      const patchSize = uniforms.grassParams.y;
-      const width = uniforms.grassParams.z;
-      const height = uniforms.grassParams.w;
-
-      const id = TSL.instanceIndex;
-
-      // const murmurHash21 = TSL.Fn(( src ) => {
-      //   const M = TSL.uint(0x5bd1e995);
-      //   const h = TSL.uvec2(1190494759, 2147483647);
-      //   src.mul(M);
-      //   src = src.xor(src.shr(24));
-      //   h.x = h.x.mul(M);
-      //   h.x = h.x.xor(src);
-      //   h.y = h.y.mul(M);
-      //   h.y = h.y.xor(src);
-      //   h.x = h.x.xor(h.x.shr(13));
-      //   h.x = h.x.mul(M);
-      //   h.x = h.x.xor(h.x.shr(15));
-      //   h.y = h.y.xor(h.y.shr(13));
-      //   h.y = h.y.mul(M);
-      //   h.y = h.y.xor(h.y.shr(15));
-      //   return h;
-      // })();
-      // const hash21 = TSL.Fn(( src ) => {
-      //   const h = murmurHash21(src);
-      //   // const h2 = TSL.uintBitsToFloat((h & 0x007fffffu) | 0x3f800000u).sub(1.0);
-      //   // return h2;
-      // })();
-        
-
-      const patchIndex = id.div(vertices);
-      // const patchOffset = patchIndex.mul(patchSize);
-      // const patchUv = TSL.uv().sub(0.5).mul(0.5);
-      // const patchPosition = patchOffset.add(patchUv.mul(patchSize));
-
-      const hashedInstanceID = TSL.hash(TSL.vec2(id)).mul(2.0).sub(1.0);
-      const grassOffset = TSL.vec3(hashedInstanceID.x, 0.0, hashedInstanceID.y).mul(patchSize);
-      // const grassBladeWorldPos = TSL.mul(TSL.modelMatrix, TSL.vec4(grassOffset, 1.0)).xyz;
-
-      const grasslocalPosition = TSL.vec4(grassOffset, 1.0);
-      const mvPosition = TSL.mul(TSL.modelViewMatrix, grasslocalPosition );
-      const finalPosition = TSL.mul(TSL.modelViewProjection, mvPosition).xyz;
+    
+    // Convert to storage buffer for compute shader
+    const positionStorage = TSL.instancedArray( positionsArray, 'vec3' );
+    console.log( positionStorage )
+    // Compute shader to set/modify vertex positions
+    const computeVertices = TSL.Fn(() => {
+      const vertexId = TSL.instanceIndex;
+      const position = positionStorage.element( vertexId );
       
-      return finalPosition;
-    })();
+      // Calculate which segment this vertex belongs to
+      const segmentId = vertexId.div(4).floor(); // 4 vertices per segment (2 front + 2 back)
+      const localVertId = vertexId.mod(4);
+      
+      // Set base positions (example: creating a ribbon)
+      const segments = uniforms.grassParams.x;
+      const t = TSL.float(segmentId).div(segments);
+      const x = t.mul(10).sub(5); // -5 to 5
+      const y = TSL.select(localVertId.lessThan(2), 0.5, -0.5); // top or bottom
+      const z = TSL.select(localVertId.mod(2).equal(0), 0, 0.1); // front or back
+      
+      position.x = x;
+      position.y = y;
+      position.z = z;
+      
+    })().compute( vertexCount );
 
     return {
       nodes: {
         colorNode: colorNode,
-        positionNode: positionNode,
-        side: THREE.FrontSide,
+        positionNode: positionStorage.toAttribute(),
+        side: THREE.DoubleSide,
         toneMapped: false,
       },
       uniforms,
     };
-  }, [ tileDataTexture, grassParams, worldOffset ]);
-  
-  // useFrame((state, delta) => {
-  //   if (material.current) {
-  //     material.current.uniforms.time.value += delta;
-  //   }
-  // });
+  }, [ tileDataTexture, grassParams, worldOffset, positionsArray, vertexCount ]);
+
   return (
     <meshStandardNodeMaterial 
       ref={ material } 
-      { ...nodes } 
-      // worldOffset={worldOffset} 
-      // tileDataTexture={ tileDataTexture }
-      // toneMapped={ false }
-      // side={ THREE.FrontSide }
-      // grassParams={ grassParams }
-      // {...delegated} 
+      { ...nodes }
     />
   )
 }

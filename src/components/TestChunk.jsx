@@ -23,10 +23,10 @@ const details = {
 function TestChunk({ position, chunkSize = 6, lodConfig }) {
   return (
     <group dispose={ null } position={ position } >
-      <mesh>
-        <octahedronGeometry args={[ 4, details[lodConfig] ]} />
-        <meshBasicMaterial />
-      </mesh>
+      {/* <mesh>
+        <octahedronGeometry args={[ 0.2, details['high'] ]} />
+        <meshBasicNodeMaterial color={ 'red' } />
+      </mesh> */}
 
       <Grass lodConfig={ lodConfig } worldOffset={ position } patchSize={ chunkSize } />
     </group>
