@@ -15,7 +15,7 @@ function Webgl() {
   return (
     <Canvas
       style={{ position: 'fixed', top: 0, left: 0, height: "100vh", width: "100vw" }}
-      camera={{ position: [0, 1, 10], fov: 45 }}
+      camera={{ position: [0, 6, 10], fov: 45 }}
       frameloop={ frameloop }
       shadows
       gl={async (props) => {

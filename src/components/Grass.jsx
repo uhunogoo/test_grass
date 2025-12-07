@@ -3,7 +3,7 @@ import * as THREE from 'three/webgpu';
 import GrassMaterial from '@components/Materials/GrassShaderMaterial';
 import React from 'react';
 
-const COUNT = 32;
+const COUNT = 32 * 1024;
 const SEGMENTS = 6;
 const VERTICES = (SEGMENTS + 1) * 2;
 const PATCHE_SIZE = 25;
@@ -71,37 +71,14 @@ function BladeOfGrass({ grassParams = {}, ...delegated }) {
       indices[i*12 + 10] = fi + 1;
       indices[i*12 + 11] = fi + 2;
     }
-    // Create positions based on vertices
-    const positions = new Float32Array(vertices * 2 * 3);
-    // for (let i = 0; i <= segments; i++) {
-    //   const y = (i / segments) * height;
-    //   const vi = i * 2;
-
-    //   // Front Face
-    //   positions[vi * 3 + 0] = -width / 2;
-    //   positions[vi * 3 + 1] = y;
-    //   positions[vi * 3 + 2] = 0;
-
-    //   positions[(vi + 1) * 3 + 0] = width / 2;
-    //   positions[(vi + 1) * 3 + 1] = y;
-    //   positions[(vi + 1) * 3 + 2] = 0;
-
-    //   // Back Face
-    //   const fi = vertices + vi;
-    //   positions[fi * 3 + 0] = -width / 2;
-    //   positions[fi * 3 + 1] = y;
-    //   positions[fi * 3 + 2] = 0;
-
-    //   positions[(fi + 1) * 3 + 0] = width / 2;
-    //   positions[(fi + 1) * 3 + 1] = y;
-    //   positions[(fi + 1) * 3 + 2] = 0;
-    // }
     
     const geo = new THREE.InstancedBufferGeometry();
     geo.instanceCount = count;
     geo.setIndex(indices);
-
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    
+    // Create positions based on vertices
+    const positions = new Float32Array( vertices * 3 );
+    geo.setAttribute('position', new THREE.BufferAttribute( positions, 3 ));
 
     geo.boundingSphere = new THREE.Sphere( 
       new THREE.Vector3(), 
@@ -114,8 +91,6 @@ function BladeOfGrass({ grassParams = {}, ...delegated }) {
     <mesh geometry={geometry} >
       <GrassMaterial 
         grassParams={[ segments, patchSize, width, height ]}
-        vertexCount={ vertices * 2 }
-        positionsArray={ geometry.attributes.position }
         {...delegated}
       />
     </mesh>

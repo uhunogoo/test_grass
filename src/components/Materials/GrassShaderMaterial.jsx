@@ -3,6 +3,12 @@ import * as TSL from 'three/tsl';
 import * as THREE from 'three/webgpu';
 import { extend, useFrame } from '@react-three/fiber'
 import { shaderMaterial, useTexture } from '@react-three/drei';
+import { hash21 } from '../../shaders/hash21';
+import { hash } from '../../shaders/hash';
+import { easeOut } from '../../shaders/easeFunctions';
+import { bezier, bezierGradient } from '../../shaders/bezier';
+import { noise } from '../../shaders/noise';
+import { rotateAxis, rotateY } from '../../shaders/rotation';
 
 const GrassShaderMaterial = shaderMaterial(
   {
@@ -367,7 +373,8 @@ function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], po
       worldOffset: new THREE.Vector3(...worldOffset),
       resolution: new THREE.Vector2(1, 1)
     };
-    console.log( uniforms )
+    console.log( uniforms.worldOffset )
+    
     const colorNode = TSL.Fn(() => {
       const uv = TSL.uv();
       const color = TSL.texture( uniforms.tileDataTexture, uv );
@@ -377,17 +384,51 @@ function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], po
 
     // Compute shader to set/modify vertex positions
     const computeVertices = TSL.Fn( () => {
+      // Default values
+      const PI = TSL.float( Math.PI );
       const position = TSL.positionLocal;
       const index = TSL.vertexIndex;
-
+      
+      // Params
       const grass_segments = TSL.int( uniforms.grassParams.x );
-      const grass_vertices = TSL.int( uniforms.grassParams.y );
+      const grass_vertices = TSL.int( TSL.add( grass_segments, 1 ).mul(2) );
+      const patch_size = TSL.float( uniforms.grassParams.y );
       const grass_width = TSL.float( uniforms.grassParams.z );
       const grass_height = TSL.float( uniforms.grassParams.w );
 
+      // Figure out grass offset
+      const hashedInstanceID = hash21( TSL.float( TSL.instanceIndex ) ).mul(2.0).sub(1.0);
+      const grassOffset = TSL.mul(
+        TSL.vec3(hashedInstanceID.x, 0.0, hashedInstanceID.y),
+        patch_size
+      );
+
+      const grassBladeWorldPos = TSL.mul(
+        TSL.modelWorldMatrix,
+        TSL.vec4(grassOffset, 1.0)
+      ).xyz;
+      const hashVal = hash( grassBladeWorldPos );
+
+      // Grass rotation
+      const angle = TSL.remap( hashVal.x, -1.0, 1.0, PI.negate(), PI );
+
+      // UV
+      const tileUV = TSL.sub(
+        TSL.vec2( grassBladeWorldPos.x.negate(), grassBladeWorldPos.z ),
+        TSL.vec2( uniforms.worldOffset.x, uniforms.worldOffset.z )
+      ).xy;
+      const tileData = TSL.texture( 
+        uniforms.tileDataTexture,
+        TSL.div( tileUV, patch_size.mul( 0.5 ).add( 0.5 ) )
+      );
+
+      // Tile settings
+      const stiffness = TSL.mul( tileData.x, 0.5 ).oneMinus();
+      const tileGrassHeight = TSL.remap(tileData.x.oneMinus(), 0.0, 1.0, 1.0, 1.5 );
+
       // Figure out vertexID, > GRASS_VERTICES is other side
       const vertFB_ID = index.mod( grass_vertices.mul( 2 ) );
-      const vertID = vertFB_ID.mod( grass_vertices.add( 1 ) );
+      const vertID = vertFB_ID.mod( grass_vertices );
 
       // 0 = left, 1 = right
       const xTest = TSL.int( vertFB_ID.bitAnd( 0x1 ) );
@@ -396,6 +437,7 @@ function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], po
         TSL.int( 1 ), 
         TSL.int( -1 ) 
       );
+
       const xSide = TSL.float( xTest );
       const zSide = TSL.float( zTest );
       const heightPercent = TSL.float( 
@@ -404,25 +446,99 @@ function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], po
           TSL.float( grass_segments ).mul(2.0)
         )
       );
-
-      const width = grass_width;
-      const height = grass_height;
+      const height = TSL.mul(grass_height, tileGrassHeight);
+      const width = TSL.mul(
+        grass_width,
+        easeOut(heightPercent.oneMinus(), 4.0).mul( tileGrassHeight )
+      );
       
       // Calculate verticex position
-      const vX = TSL.mul( TSL.sub(xSide, 0.5), width );
-      const vY = TSL.mul( heightPercent, height );
-      const vZ = TSL.float( 0.0 );
+      let vX = TSL.mul( TSL.sub(xSide, 0.5), width );
+      let vY = TSL.mul( heightPercent, height );
+      let vZ = TSL.float( 0.0 );
+
+      // calculate lean factor
+      const windStrangth = noise(
+        TSL.vec3(
+          TSL.mul( grassBladeWorldPos.xz, 0.05 ),
+          0.0
+        ).add( TSL.time.mul( 0.4 ) )
+      );
+      const windAngle = 0.0;
+      const windAxis = TSL.vec3( TSL.cos(windAngle), 0.0, TSL.sin(windAngle) );
+      const windLeanAngle = windStrangth.mul(1.5).mul(heightPercent).mul( stiffness );
+
+      const randomLeanAnimation = noise(
+        TSL.vec3(
+          grassBladeWorldPos.xz,
+          TSL.time.mul(1.5)
+        )
+      ).mul( TSL.add( windStrangth.mul(0.5), 0.125 ) );
+      const leanFactor = TSL.add(
+        TSL.remap( hashVal.y, -1.0, 1.0, -0.5, 0.5 ),
+        randomLeanAnimation.x
+      );
+
+      // Add bezier curve
+      const p0 = TSL.vec3( 0.0, 0.0, 0.0 );
+      const p1 = TSL.vec3( 0.0, 0.33, 0.0 );
+      const p2 = TSL.vec3( 0.0, 0.66, 0.0 );
+      const p3 = TSL.vec3( 0.0, TSL.cos(leanFactor), TSL.sin(leanFactor) );
+      const curve = bezier( heightPercent, p0, p1, p2, p3 );
       
-      // Offset for instancing
-      const offset = TSL.float( TSL.instanceIndex ).mul( 0.5 );
+      // Calculate normal
+      const curveGradient = bezierGradient( heightPercent, p0, p1, p2, p3 );
+      const curveRot90 = TSL.mat2(0.0, 1.0, -1.0, 0.0).mul( zSide.negate() );
+
+      // Add curve to position
+      vY = height.mul( curve.y );
+      vZ = height.mul( curve.z );
+
+      // Generate grass matrix
+      const grassMatrix = TSL.mul(
+        TSL.mat3( rotateAxis( windAxis, windLeanAngle ) ),
+        rotateY(angle)
+      );
+
+      const grassLocalPosition = TSL.mul(
+        grassMatrix,
+        TSL.vec3( vX, vY, vZ )
+      ).add( grassOffset );
+      let grassLocalNormal = TSL.mul(
+        grassMatrix,
+        TSL.vec3( 0.0, curveRot90.mul( curveGradient.yz ) )
+      );
+
+      // Blend normals
+      const distanceBlend = TSL.smoothstep( 0.0, 10.0, TSL.distance( TSL.cameraPosition, grassBladeWorldPos ) );
+      grassLocalNormal = TSL.mix( grassLocalNormal, TSL.vec3( 0.0, 1.0, 0.0 ), distanceBlend.mul(0.5) );
+      grassLocalNormal = TSL.normalize( grassLocalNormal );
+
+      // View thikness
+      const mvPosition = TSL.modelWorldMatrix.mul( TSL.vec4( grassLocalPosition, 1.0 ) );
+      const viewDir = TSL.normalize( TSL.sub( TSL.cameraPosition, grassBladeWorldPos ) );
+      const grassFaceNormal = TSL.mul( 
+        grassMatrix, 
+        TSL.vec3( 0.0, 0.0, zSide.negate() ) 
+      );
+      const viewDotNormal = TSL.saturate( TSL.dot( grassFaceNormal, viewDir ) );
+      const viewSpaceThiknessFactor = TSL.mul(
+        easeOut( viewDotNormal.oneMinus(), 4.0 ),
+        TSL.smoothstep( 0.0, 0.2, viewDotNormal )
+      );
+
+      mvPosition.x.add(
+        viewSpaceThiknessFactor.mul( TSL.sub(xSide, 0.5).mul(width).mul(0.5).mul( zSide.negate() ) )
+      )
 
       // Calculate position
-      const x = position.x.assign( vX.mul( TSL.hash(vX).mul(10) ) );
-      const y = position.y.assign( vY );
-      const z = position.z.assign( vZ );
+      const x = position.x.assign( mvPosition.x );
+      const y = position.y.assign( mvPosition.y );
+      const z = position.z.assign( mvPosition.z );
 
+      const finalPosition = TSL.vec3( x, y, z );
       
-      return TSL.vec3(x.add(offset), y, z);
+      return finalPosition;
     })();
 
     return {
