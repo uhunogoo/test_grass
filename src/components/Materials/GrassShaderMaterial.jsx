@@ -363,54 +363,79 @@ function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], po
   const { nodes, uniforms } = React.useMemo(() => {
     const uniforms = {
       tileDataTexture: tileDataTexture,
-      grassParams: TSL.uniform( TSL.vec4(...grassParams) ),
-      worldOffset: TSL.uniform( TSL.vec3(...worldOffset) ),
-      // time: TSL.uniform( 0 ),
-      resolution: TSL.uniform( TSL.vec2(1, 1) )
+      grassParams: new THREE.Vector4(...grassParams),
+      worldOffset: new THREE.Vector3(...worldOffset),
+      resolution: new THREE.Vector2(1, 1)
     };
-    
+    console.log( uniforms )
     const colorNode = TSL.Fn(() => {
       const uv = TSL.uv();
       const color = TSL.texture( uniforms.tileDataTexture, uv );
       
       return TSL.vec3( 0, 0, 0 );
     })();
-    
-    // Convert to storage buffer for compute shader
-    const positionStorage = TSL.instancedArray( positionsArray, 'vec3' );
-    console.log( positionStorage )
+
     // Compute shader to set/modify vertex positions
-    const computeVertices = TSL.Fn(() => {
-      const vertexId = TSL.instanceIndex;
-      const position = positionStorage.element( vertexId );
+    const computeVertices = TSL.Fn( () => {
+      const position = TSL.positionLocal;
+      const index = TSL.vertexIndex;
+
+      const grass_segments = TSL.int( uniforms.grassParams.x );
+      const grass_vertices = TSL.int( uniforms.grassParams.y );
+      const grass_width = TSL.float( uniforms.grassParams.z );
+      const grass_height = TSL.float( uniforms.grassParams.w );
+
+      // Figure out vertexID, > GRASS_VERTICES is other side
+      const vertFB_ID = index.mod( grass_vertices.mul( 2 ) );
+      const vertID = vertFB_ID.mod( grass_vertices.add( 1 ) );
+
+      // 0 = left, 1 = right
+      const xTest = TSL.int( vertFB_ID.bitAnd( 0x1 ) );
+      const zTest = TSL.select( 
+        vertFB_ID.greaterThanEqual( grass_vertices ), 
+        TSL.int( 1 ), 
+        TSL.int( -1 ) 
+      );
+      const xSide = TSL.float( xTest );
+      const zSide = TSL.float( zTest );
+      const heightPercent = TSL.float( 
+        TSL.div(
+          TSL.float( TSL.sub(vertID, xTest) ),
+          TSL.float( grass_segments ).mul(2.0)
+        )
+      );
+
+      const width = grass_width;
+      const height = grass_height;
       
-      // Calculate which segment this vertex belongs to
-      const segmentId = vertexId.div(4).floor(); // 4 vertices per segment (2 front + 2 back)
-      const localVertId = vertexId.mod(4);
+      // Calculate verticex position
+      const vX = TSL.mul( TSL.sub(xSide, 0.5), width );
+      const vY = TSL.mul( heightPercent, height );
+      const vZ = TSL.float( 0.0 );
       
-      // Set base positions (example: creating a ribbon)
-      const segments = uniforms.grassParams.x;
-      const t = TSL.float(segmentId).div(segments);
-      const x = t.mul(10).sub(5); // -5 to 5
-      const y = TSL.select(localVertId.lessThan(2), 0.5, -0.5); // top or bottom
-      const z = TSL.select(localVertId.mod(2).equal(0), 0, 0.1); // front or back
+      // Offset for instancing
+      const offset = TSL.float( TSL.instanceIndex ).mul( 0.5 );
+
+      // Calculate position
+      const x = position.x.assign( vX.mul( TSL.hash(vX).mul(10) ) );
+      const y = position.y.assign( vY );
+      const z = position.z.assign( vZ );
+
       
-      position.x = x;
-      position.y = y;
-      position.z = z;
-      
-    })().compute( vertexCount );
+      return TSL.vec3(x.add(offset), y, z);
+    })();
 
     return {
       nodes: {
         colorNode: colorNode,
-        positionNode: positionStorage.toAttribute(),
+        positionNode: computeVertices,
         side: THREE.DoubleSide,
         toneMapped: false,
+        wireframe: true,
       },
       uniforms,
     };
-  }, [ tileDataTexture, grassParams, worldOffset, positionsArray, vertexCount ]);
+  }, [ tileDataTexture, grassParams, worldOffset ]);
 
   return (
     <meshStandardNodeMaterial 
