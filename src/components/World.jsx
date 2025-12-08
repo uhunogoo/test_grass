@@ -9,7 +9,7 @@ function World() {
   });
   return (
     <>
-      <ChunkField playerPosition={ playerPosition } />
+      <ChunkField playerPosition={ playerPosition } radius={ 1 } />
     </>
   )
 }
