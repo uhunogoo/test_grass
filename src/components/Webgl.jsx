@@ -12,20 +12,27 @@ extend( THREE );
 function Webgl() {
   const [ frameloop, setFrameloop ] = React.useState( "never" );
 
+  const initRenderer = React.useCallback(async (props) => {
+    const renderer = new THREE.WebGPURenderer({
+      powerPreference: "high-performance",
+      antialias: true,
+      alpha: false,
+      stencil: false,
+      shadowMap: true,
+      ...props
+    });
+    await renderer.init();
+    setFrameloop("always");
+    return renderer;
+  }, []);
+
   return (
     <Canvas
       style={{ position: 'fixed', top: 0, left: 0, height: "100vh", width: "100vw" }}
       camera={{ position: [0, 6, 10], fov: 45 }}
       frameloop={ frameloop }
       shadows
-      gl={async (props) => {
-        const renderer = new THREE.WebGPURenderer(props);
-        await renderer.init().then(() => {
-          setFrameloop("always");
-        });
-        
-        return renderer;
-      }}
+      gl={ initRenderer }
     >
       
       <color attach="background" args={["white"]} />

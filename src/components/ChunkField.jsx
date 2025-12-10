@@ -37,7 +37,6 @@ function ChunkField({
   return (
     <>
       { Array.from(allChunks.values()).map((chunk) => (
-        // console.log( chunk )
         <TestChunk
           key={ `${chunk.key}-${chunk.lod}` }
           position={ chunk.position } 
