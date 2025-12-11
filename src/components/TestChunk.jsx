@@ -20,10 +20,10 @@ const details = {
   low: 1
 }
 
-function TestChunk({ position, chunkSize = 6, lodConfig }) {
+function TestChunk({ position, children }) {
   return (
     <group dispose={ null } position={ position } >
-      <Grass lodConfig={ lodConfig } worldOffset={ position } patchSize={ chunkSize } />
+      { children }
     </group>
   )
 }

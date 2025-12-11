@@ -1,16 +1,11 @@
-import useStore from '@stores/store-grass';
 import GrassMaterial from '@components/Materials/GrassShaderMaterial';
 
-
-function Grass({ lodConfig = "high", worldOffset = [0, 0, 0] }) {
-  const { patchSize, width, height } = useStore( ( state ) => state.defaultConfig );
-  const LOD = useStore( ( state ) => state.lodConfig );
-  
+function Grass({ geometry, segments, patchSize, width, height, worldOffset = [0, 0, 0] }) {
   return (
     <group dispose={ null }>
-      <mesh geometry={LOD[lodConfig].geometry} >
+      <mesh geometry={ geometry } >
         <GrassMaterial 
-          grassParams={[ LOD[lodConfig].segments, patchSize, width, height ]}
+          grassParams={[ segments, patchSize, width, height ]}
           worldOffset={ worldOffset }
         />
       </mesh>

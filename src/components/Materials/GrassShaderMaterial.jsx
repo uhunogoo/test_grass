@@ -3,15 +3,15 @@ import * as TSL from 'three/tsl';
 import * as THREE from 'three/webgpu';
 import {  useTexture } from '@react-three/drei';
 
-import { hash21 } from '../../shaders/hash21';
-import { hash } from '../../shaders/hash';
-import { easeOut } from '../../shaders/easeFunctions';
-import { bezier, bezierGradient } from '../../shaders/bezier';
-import { noise } from '../../shaders/noise';
-import { rotateAxis, rotateY } from '../../shaders/rotation';
-import { hemiLight, lemberLight, phongSpecular } from '../../shaders/lights';
+import { hash21 } from '@shaders/hash21';
+import { hash } from '@shaders/hash';
+import { easeOut } from '@shaders/easeFunctions';
+import { bezier, bezierGradient } from '@shaders/bezier';
+import { noise } from '@shaders/noise';
+import { rotateAxis, rotateY } from '@shaders/rotation';
+import { hemiLight, lemberLight, phongSpecular } from '@shaders/lights';
 
-function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], ...delegated}) {
+function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1] }) {
   const material = React.useRef( null );
   const tileDataTexture = useTexture('./tileTexture.png');
   const { nodes, uniforms } = React.useMemo(() => {
@@ -148,7 +148,7 @@ function GrassMaterial({ worldOffset = [0, 0, 0], grassParams = [1, 1, 1, 1], ..
 
       // --- ROTATION AROUND Y (make plane face camera horizontally only) ---
       const camAngle = TSL.atan(toCamera.x, toCamera.z);
-      const calculatedAngle = camAngle.add(TSL.PI.mul(0.25));
+      const calculatedAngle = camAngle.add(- Math.PI * 0.5);
       const s = TSL.sin(calculatedAngle);
       const c = TSL.cos(calculatedAngle);
 

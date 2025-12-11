@@ -4,15 +4,6 @@ import { subscribeWithSelector } from 'zustand/middleware';
 
 import { calculateIndices } from '@lib/utils';
 
-// segments: config.segments,
-// patchSize: patchSize,
-// vertices: (config.segments + 1) * 2,
-// count: config.count,
-// width: WIDTH,
-// height: HEIGHT
-
-const COUNT = 32 * 1024;
-
 export default create( subscribeWithSelector( ( set ) => {
   const baseCount = 32 * 1024;
   const patchSize = 25;
@@ -37,6 +28,7 @@ export default create( subscribeWithSelector( ( set ) => {
     const vertices = (config.segments + 1) * 2;
     const computedIndices = calculateIndices(config.segments, vertices);
     const currentGeometry = geometry.clone();
+    currentGeometry.computeVertexNormals()
 
     // Set up geometry
     currentGeometry.instanceCount = config.count;

@@ -4,12 +4,12 @@ import { useControls } from 'leva';
 import ChunkField from '@components/ChunkField';
 
 function World() {
-  const { playerPosition } = useControls('playerPosition', {
-    playerPosition: { value: [0, 0], min: 0, max: 100, step: 5 }
-  });
+  // const { playerPosition } = useControls('playerPosition', {
+  //   playerPosition: { value: [0, 0], min: 0, max: 100, step: 5 }
+  // });
   return (
     <>
-      <ChunkField playerPosition={ playerPosition } radius={ 2 } />
+      <ChunkField radius={ 2 } />
     </>
   )
 }

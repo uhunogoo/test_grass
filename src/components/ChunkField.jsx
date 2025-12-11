@@ -1,14 +1,15 @@
 import React from 'react';
 import TestChunk from '@components/TestChunk';
+import Grass from '@components/Grass';
+import useStore from '@stores/store-grass';
 
 function ChunkField({ 
   chunkSize = 25,
-  playerChunkPosition = [0, 0], // x, z 
   radius = 2
 }) {
   const allChunks = React.useMemo(() => {
     const chunks = new Map();
-    const [px, pz] = playerChunkPosition;
+    const [px, pz] = [0 ,0];
   
     for (let dz = -radius; dz <= radius; dz++) {
       for (let dx = -radius; dx <= radius; dx++) {
@@ -32,8 +33,13 @@ function ChunkField({
     }
     
     return chunks;
-  }, [ playerChunkPosition, chunkSize, radius ]);
+  }, [ chunkSize, radius ]);
   
+  const defaultConfig = useStore( ( state ) => state.defaultConfig );
+  const lodConfig = useStore( ( state ) => state.lodConfig );
+
+  console.log( lodConfig )
+
   return (
     <>
       { Array.from(allChunks.values()).map((chunk) => (
@@ -42,10 +48,20 @@ function ChunkField({
           position={ chunk.position } 
           chunkSize={ chunkSize } 
           lodConfig={ chunk.lod } 
-        />
+        >
+          <Grass
+            geometry={ lodConfig[chunk.lod].geometry }
+            segments={ lodConfig[chunk.lod].segments }
+            chunkSize={ chunkSize }
+            patchSize={ defaultConfig.patchSize }
+            width={ defaultConfig.width }
+            height={ defaultConfig.height }
+            worldOffset={ chunk.position }
+          />
+        </TestChunk>
       )) }
     </>
   )
 }
 
-export default ChunkField;
+export default React.memo(ChunkField);
